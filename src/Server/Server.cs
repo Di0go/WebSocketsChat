@@ -1,14 +1,13 @@
 using System;
-using System.Net.Sockets;
-using System.Net.WebSockets;
-using System.Collections.Generic;
 using System.Net;
-using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 class Server
 {
+    #region Fields
     // Server
     private TcpListener m_TCPListener;
+    public bool m_IsServerOn;
 
     // Server address and port
     private IPAddress m_IPAddress;
@@ -17,15 +16,24 @@ class Server
     // Client list
     public List<TcpClient> m_Clients;
 
+    // Thread list
+    public List<Thread> m_ThreadPool;
+    #endregion
+
     // Constructor
     public Server(string p_IPAddress, int p_Port)
     {
+        // Turn the server on
+        m_IsServerOn = true;
+
+        // Add the properties
         m_IPAddress = IPAddress.Parse(p_IPAddress);
         m_Port = p_Port;
 
-        // Initialize the Listener and the Client List
-        m_TCPListener = new TcpListener(m_IPAddress, m_Port);
+        // Initialize the Listener, the Client List and the Thread List
         m_Clients = new List<TcpClient>();
+        m_ThreadPool = new List<Thread>();
+        m_TCPListener = new TcpListener(m_IPAddress, m_Port);
     }
 
     // Start listening for connections
@@ -45,7 +53,11 @@ class Server
 
         Console.WriteLine("A new client has joined from " + newClient.Client.RemoteEndPoint);
 
-        Handshake(newClient);
+        // Create and Start new thread 
+        Thread newThread = new Thread(new ParameterizedThreadStart(Handshake));
+        newThread.Start(newClient);
+
+        m_ThreadPool.Add(newThread);
     }
 
     // Method to handle client disconnection
@@ -54,6 +66,9 @@ class Server
         m_Clients.Remove(p_Client);
         Console.WriteLine("Client disconnect from: " +  p_Client.Client.RemoteEndPoint);
         p_Client.Close();
+
+        // Shutdown the Thread
+        return;
     }
 
     // Checks if socket is connected
@@ -71,26 +86,31 @@ class Server
 
     // When a client connects to a server, it sends a GET request to upgrade the connection to a WebSocket from a simple HTTP request. 
     // This is known as handshaking.
-    private void Handshake(TcpClient p_Client)
+    private void Handshake(object? p_Client)
     {
-        NetworkStream clientStream = p_Client.GetStream();
-        Socket clientSocket = clientStream.Socket;
-
-        while (true)
+        if (p_Client != null)
         {
-            if (!IsConnected(clientSocket))
+            TcpClient l_Client = (TcpClient)p_Client;
+
+            NetworkStream clientStream = l_Client.GetStream();
+            Socket clientSocket = clientStream.Socket;
+
+            while (true)
             {
-               Disconnect(p_Client);
-               break; 
-            }
+                if (!IsConnected(clientSocket))
+                {
+                    Disconnect(l_Client);
+                    break; 
+                }
 
-            // Don't read data if there's no data.
-            if (!clientStream.DataAvailable) continue;
+                // Don't read data if there's no data.
+                if (!clientStream.DataAvailable) continue;
 
-            // Get the available (ready to read) data from the client.
-            byte[] clientBuffer = new byte[p_Client.Available];
+                // Get the available (ready to read) data from the client.
+                byte[] clientBuffer = new byte[l_Client.Available];
 
-            Console.WriteLine(clientStream.Read(clientBuffer, 0, clientBuffer.Length));
+                Console.WriteLine(clientStream.Read(clientBuffer, 0, clientBuffer.Length));
+            } 
         }
     }
  
