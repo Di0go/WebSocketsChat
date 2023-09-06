@@ -1,6 +1,9 @@
 using System;
 using System.Net;
+using System.Text;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
+
 
 class Server
 {
@@ -109,7 +112,20 @@ class Server
                 // Get the available (ready to read) data from the client.
                 byte[] clientBuffer = new byte[l_Client.Available];
 
-                Console.WriteLine(clientStream.Read(clientBuffer, 0, clientBuffer.Length));
+                // Read the client data into the buffer-
+                clientStream.Read(clientBuffer, 0, clientBuffer.Length);
+
+                string encodedData = Encoding.UTF8.GetString(clientBuffer);
+
+                // If the encodedData is a GET request
+                if (Regex.IsMatch(encodedData, "^GET"))
+                {
+                    Console.WriteLine("Yes");
+                }
+                else
+                {
+
+                }
             } 
         }
     }
