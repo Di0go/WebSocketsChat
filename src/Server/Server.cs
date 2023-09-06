@@ -3,7 +3,7 @@ using System.Net;
 using System.Text;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
-
+using System.Security.Cryptography;
 
 class Server
 {
@@ -120,7 +120,32 @@ class Server
                 // If the encodedData is a GET request
                 if (Regex.IsMatch(encodedData, "^GET"))
                 {
-                    Console.WriteLine("Yes");
+                    const string newLine = "\r\n";
+
+                    /*
+                    1. Obtain the value of the "Sec-WebSocket-Key" request header without any leading or trailing whitespace
+                    2. Concatenate it with "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" (a special GUID specified by RFC 6455)
+                    3. Compute SHA-1 and Base64 hash of the new value
+                    4. Write the hash back as the value of "Sec-WebSocket-Accept" response header in an HTTP response
+                    */
+
+                    // Make the response to the client
+                    byte[] response = Encoding.UTF8.GetBytes(
+
+                                "HTTP/1.1 101 Switching Protocols" + newLine
+                                + "Connection: Upgrade" + newLine
+                                + "Upgrade: websocket" + newLine
+                                + "Sec-WebSocket-Accept: " + Convert.ToBase64String(
+                                SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(
+                                new Regex("Sec-WebSocket-Key: (.*)").Match(encodedData).Groups[1].Value.Trim() 
+                                + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")))
+                                + newLine
+                                + newLine
+
+                                );
+
+                    // Write response to client
+                    clientStream.Write(response, 0, response.Length);
                 }
                 else
                 {
@@ -129,5 +154,4 @@ class Server
             } 
         }
     }
- 
 }
